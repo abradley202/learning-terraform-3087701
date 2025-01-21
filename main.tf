@@ -14,78 +14,53 @@ data "aws_ami" "app_ami" {
   owners = ["979382823631"] # Bitnami
 }
 
-module "blog_vpc" {
-  source = "terraform-aws-modules/vpc/aws"
-
-  name = "dev"
-  cidr = "10.0.0.0/16"
-
-  azs             = ["us-west-2a","us-west-2b","us-west-2c"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-
+data "aws_vpc" "default" {
+  default = true
 }
-  tags = {
-    Terraform = "true"
-    Environment = "dev"
-  }
-}
-
-
 
 resource "aws_instance" "blog" {
   ami                    = data.aws_ami.app_ami.id
   instance_type          = var.instance_type
-  subnet_id              = module.blog_vpc.public_subnets[0]
-  vpc_security_group_ids = [module.blog_sg.security_group_id]
+  vpc_security_group_ids = [aws_security_group.blog.id]
 
   tags = {
     Name = "Learning Terraform"
   }
 }
 
-module "alb" {
-  source = "terraform-aws-modules/alb/aws"
-
-  name    = "blog-alb"
-  vpc_id  = "module.blog_vpc.vpc_id"
-  subnets = module.blog_vpc.public_subnets
-
-  # Security Group
-  security_group_ingress_rules = {
-    all_http = {
-      from_port   = 80
-      to_port     = 80
-      ip_protocol = "tcp"
-      description = "HTTP web traffic"
-      cidr_ipv4   = "0.0.0.0/0"
-  }
-
-
-
-  target_groups = {
-    ex-instance = {
-      name_prefix      = "h1"
-      protocol         = "HTTP"
-      port             = 80
-      target_type      = "blog-"
-      target_id        = "aws_instance.blog.id"
-    }
-  }
-
+resource "aws_security_group" "blog" {
+  name = "blog"
   tags = {
-    Environment = "dev"
-    Project     = "Example"
+    Terraform = "true"
   }
+  vpc_id = data.aws_vpc.default.id
 }
 
-module "blog_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "4.13.0"
+resource "aws_security_group_rule" "blog_http_in" {
+  type        = "ingress"
+  from_port   = 80
+  to_port     = 80
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.blog.id
+}
 
-  vpc_id  = module.blog_vpc.vpc_id
-  name    = "blog"
-  ingress_rules = ["https-443-tcp","http-80-tcp"]
-  ingress_cidr_blocks = ["0.0.0.0/0"]
-  egress_rules = ["all-all"]
-  egress_cidr_blocks = ["0.0.0.0/0"]
+
+resource "aws_security_group_rule" "blog_https_in" {
+  type        = "ingress"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.blog.id
+}
+
+
+resource "aws_security_group_rule" "blog_everything_out" {
+  type        = "egress"
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.blog.id
 }
