@@ -50,7 +50,7 @@ subnet_id = module.blog_vpc.public_subnets[0]
 module "alb" {
   source = "terraform-aws-modules/alb/aws"
 
-  name    = "blog_alb"
+  name    = "blog-alb"
   load_balancer_type = "application"
 
   vpc_id          = "module.blog_vpc.vpc_id"
@@ -59,15 +59,18 @@ module "alb" {
 
   
 
-  target_groups = {
-    ex-instance = {
-      name_prefix      = "blog"
-      protocol         = "HTTP"
-      port             = 80
-      target_type      = "instance"
-      target_id        = "aws_instance.blog.id"
-    }
-  }
+  target_groups = [
+    {
+       name_prefix      = "blog-alb"
+       backend_protocal = "HTTP"
+       backend_port     = 80
+       target_type      = "instance
+       targets = {
+         target_id = "aws_instance.blog.id"
+         port = 80
+       }
+       )
+]
 
   tags = {
     Environment = "Dev"
@@ -79,6 +82,6 @@ http_tcp_listeners = [
   {
     port               = 80
     protocol           = "HTTP"
-    target_group_index =   0
+    target_group_index = 0
   }
 ]
