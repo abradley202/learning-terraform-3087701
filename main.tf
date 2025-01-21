@@ -47,16 +47,38 @@ subnet_id = module.blog_vpc.public_subnets[0]
   }
 }
 
-module "blog_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "5.3.0"
-  name    = "blog"
+module "alb" {
+  source = "terraform-aws-modules/alb/aws"
 
-  vpc_id              = module.blog_vpc.vpc_id
+  name    = "blog-alb"
+  load_balancer_type = "application'
 
-  ingress_rules       = ["http-80-tcp", "https-443-tcp"]
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  vpc_id  = "module.blog_vpc.vpc_id"
+  subnets = module.blog_vpc.public_subnets
+  security_groups = module.blog_sg.security_group.id
 
-  egress_rules       = ["all-all"]
-  egress_cidr_blocks = ["0.0.0.0/0"]
+  
+
+  target_groups = {
+    ex-instance = {
+      name_prefix      = "blog"
+      protocol         = "HTTP"
+      port             = 80
+      target_type      = "instance"
+      target_id        = "aws_instance.blog.id"
+    }
+  }
+
+  tags = {
+    Environment = "Dev"
+  
+  }
 }
+
+http_tcp_listeners = [
+  {
+    port               = 80
+    protocol           = "HTTP"
+    target_group_index =   0
+  }
+]
